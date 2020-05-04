@@ -75,30 +75,18 @@ SDL_AudioDeviceID projectMSDL::selectAudioInput(int _count) {
     return 0;
 }
 
-int projectMSDL::openAudioInput() {
-    // get audio driver name (static)
-    const char* driver_name = SDL_GetCurrentAudioDriver();
-    SDL_Log("Using audio driver: %s\n", driver_name);
+int projectMSDL::toggleAudioInput() {
+    
+    CurAudioDevice++;
+    if (CurAudioDevice >= NumAudioDevices)
+        CurAudioDevice = 0;
+    selectedAudioDevice = CurAudioDevice;
+    initAudioInput();
+    return 1;
+}
 
-    // get audio input device
-    unsigned int i, count2 = SDL_GetNumAudioDevices(true);  // capture, please
-    if (count2 == 0) {
-        SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "No audio capture devices found");
-        SDL_Quit();
-    }
-    for (i = 0; i < count2; i++) {
-        SDL_Log("Found audio capture device %d: %s", i, SDL_GetAudioDeviceName(i, true));
-    }
-
-    SDL_AudioDeviceID selectedAudioDevice = 0;  // device to open
-    if (count2 > 1) {
-        // need to choose which input device to use
-        selectedAudioDevice = selectAudioInput(count2);
-	if (selectedAudioDevice > count2) {
-            SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "No audio input device specified.");
-            SDL_Quit();
-        }
-    }
+int projectMSDL::initAudioInput() {
+    
 
     // params for audio input
     SDL_AudioSpec want, have;
@@ -128,6 +116,41 @@ int projectMSDL::openAudioInput() {
     audioSampleCount = have.samples;
     audioFormat = have.format;
     audioInputDevice = audioDeviceID;
+    
+    return 1;
+}
+
+int projectMSDL::openAudioInput() {
+    // get audio driver name (static)
+    const char* driver_name = SDL_GetCurrentAudioDriver();
+    SDL_Log("Using audio driver: %s\n", driver_name);
+    
+    // get audio input device
+    unsigned int i;
+    NumAudioDevices = SDL_GetNumAudioDevices(true);  // capture, please
+
+    CurAudioDevice = 0;
+    if (NumAudioDevices == 0) {
+        SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "No audio capture devices found");
+        SDL_Quit();
+    }
+    for (i = 0; i < NumAudioDevices; i++) {
+        SDL_Log("Found audio capture device %d: %s", i, SDL_GetAudioDeviceName(i, true));
+    }
+    
+    // device to open
+    selectedAudioDevice = 0;
+    if (NumAudioDevices > 1) {
+        // need to choose which input device to use
+        selectedAudioDevice = selectAudioInput(CurAudioDevice);
+    if (selectedAudioDevice > NumAudioDevices) {
+            SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "No audio input device specified.");
+            SDL_Quit();
+        }
+    }
+    
+    initAudioInput();
+    
     return 1;
 }
 
@@ -149,6 +172,66 @@ void projectMSDL::maximize() {
 
     SDL_SetWindowSize(win, dm.w, dm.h);
     resize(dm.w, dm.h);
+}
+
+/* Stretch projectM across multiple monitors */
+void projectMSDL::stretchMonitors()
+{
+	int displayCount = SDL_GetNumVideoDisplays();
+	if (displayCount >= 2)
+	{
+		std::vector<SDL_Rect> displayBounds;
+		for (int i = 0; i < displayCount; i++)
+		{
+			displayBounds.push_back(SDL_Rect());
+			SDL_GetDisplayBounds(i, &displayBounds.back());
+		}
+
+		int mostXLeft = 0;
+		int mostXRight = 0;
+		int mostWide = 0;
+		int mostYUp = 0;
+		int mostYDown = 0;
+		int mostHigh = 0;
+
+		for (int i = 0; i < displayCount; i++)
+		{
+			if (displayBounds[i].x < mostXLeft) mostXLeft = displayBounds[i].x;
+			if ((displayBounds[i].x + displayBounds[i].w) > mostXRight) mostXRight = displayBounds[i].x + displayBounds[i].w;
+		}
+		for (int i = 0; i < displayCount; i++)
+		{
+			if (displayBounds[i].y < mostYUp) mostYUp = displayBounds[i].y;
+			if ((displayBounds[i].y + displayBounds[i].h) > mostYDown) mostYDown = displayBounds[i].y + displayBounds[i].h;
+		}
+
+        mostWide = abs(mostXLeft) + abs(mostXRight);
+        mostHigh = abs(mostYUp) + abs(mostYDown);
+
+		SDL_SetWindowPosition(win, mostXLeft, mostYUp);
+		SDL_SetWindowSize(win, mostWide, mostHigh);
+	}
+}
+
+/* Moves projectM to the next monitor */
+void projectMSDL::nextMonitor()
+{
+	int displayCount = SDL_GetNumVideoDisplays();
+	int currentWindowIndex = SDL_GetWindowDisplayIndex(win);
+	if (displayCount >= 2)
+	{
+		std::vector<SDL_Rect> displayBounds;
+		int nextWindow = currentWindowIndex + 1;
+		if (nextWindow >= displayCount) nextWindow = 0;
+
+		for (int i = 0; i < displayCount; i++)
+		{
+			displayBounds.push_back(SDL_Rect());
+			SDL_GetDisplayBounds(i, &displayBounds.back());
+		}
+		SDL_SetWindowPosition(win, displayBounds[nextWindow].x, displayBounds[nextWindow].y);
+		SDL_SetWindowSize(win, displayBounds[nextWindow].w, displayBounds[nextWindow].h);
+	}
 }
 
 void projectMSDL::toggleFullScreen() {
@@ -180,8 +263,33 @@ void projectMSDL::keyHandler(SDL_Event *sdl_evt) {
                 return;
             }
             break;
-
-
+        case SDLK_i:
+                if (sdl_mod & KMOD_LGUI || sdl_mod & KMOD_RGUI || sdl_mod & KMOD_LCTRL)
+                {
+                    toggleAudioInput();
+                    return; // handled
+                }
+            break;
+		case SDLK_s:
+			if (sdl_mod & KMOD_LGUI || sdl_mod & KMOD_RGUI || sdl_mod & KMOD_LCTRL)
+			{
+				// command-s: [s]tretch monitors
+				// Stereo requires fullscreen
+#if !STEREOSCOPIC_SBS
+				stretchMonitors();
+#endif
+				return; // handled
+			}
+		case SDLK_m:
+			if (sdl_mod & KMOD_LGUI || sdl_mod & KMOD_RGUI || sdl_mod & KMOD_LCTRL)
+			{
+				// command-m: change [m]onitor
+				// Stereo requires fullscreen
+#if !STEREOSCOPIC_SBS
+				nextMonitor();
+#endif
+				return; // handled
+			}
         case SDLK_f:
             if (sdl_mod & KMOD_LGUI || sdl_mod & KMOD_RGUI || sdl_mod & KMOD_LCTRL) {
                 // command-f: fullscreen
@@ -297,10 +405,15 @@ void projectMSDL::pollEvent() {
     {
         switch (evt.type) {
             case SDL_WINDOWEVENT:
+            int h, w;
+            SDL_GL_GetDrawableSize(win,&w,&h);
                 switch (evt.window.event) {
-                    case SDL_WINDOWEVENT_RESIZED:
-                        resize(evt.window.data1, evt.window.data2);
-                        break;
+					case SDL_WINDOWEVENT_RESIZED:
+						resize(w, h);
+						break;
+					case SDL_WINDOWEVENT_SIZE_CHANGED:
+                        resize(w, h);
+						break;
                 }
                 break;
             case SDL_KEYDOWN:
@@ -447,4 +560,7 @@ void projectMSDL::renderTexture() {
 void projectMSDL::presetSwitchedEvent(bool isHardCut, size_t index) const {
     std::string presetName = getPresetName(index);
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Displaying preset: %s\n", presetName.c_str());
+    
+    std::string newTitle = "projectM ➫ " + presetName;
+    SDL_SetWindowTitle(win, newTitle.c_str());
 }

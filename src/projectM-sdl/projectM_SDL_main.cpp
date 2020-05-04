@@ -244,7 +244,6 @@ srand((int)(time(NULL)));
 #if UNLOCK_FPS
     setenv("vblank_mode", "0", 1);
 #endif
-
     SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
 
     if (! SDL_VERSION_ATLEAST(2, 0, 5)) {
@@ -278,9 +277,10 @@ srand((int)(time(NULL)));
 #endif
 
     
-    SDL_Window *win = SDL_CreateWindow("projectM", 0, 0, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+    SDL_Window *win = SDL_CreateWindow("projectM", 0, 0, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     
-
+    SDL_GL_GetDrawableSize(win,&width,&height);
+    
 #if STEREOSCOPIC_SBS
 
 	// enable stereo
@@ -306,7 +306,11 @@ srand((int)(time(NULL)));
     SDL_SetWindowTitle(win, "projectM Visualizer");
     
     SDL_GL_MakeCurrent(win, glCtx);  // associate GL context with main window
-    SDL_GL_SetSwapInterval(-1); // Enable adaptive vsync
+    int avsync = SDL_GL_SetSwapInterval(-1); // try to enable adaptive vsync
+    if (avsync == -1) { // adaptive vsync not supported
+        SDL_GL_SetSwapInterval(1); // enable updates synchronized with vertical retrace
+    }
+
     
     projectMSDL *app;
     
@@ -324,13 +328,26 @@ srand((int)(time(NULL)));
         base_path = SDL_GetBasePath();
         SDL_Log("Config file not found, using built-in settings. Data directory=%s\n", base_path.c_str());
 
+		// Get max refresh rate from attached displays to use as built-in max FPS.
+		int i = 0;
+		int maxRefreshRate = 0;
+		SDL_DisplayMode current;
+		for (i = 0; i < SDL_GetNumVideoDisplays(); ++i)
+		{
+			if (SDL_GetCurrentDisplayMode(i, &current) == 0)
+			{
+				if (current.refresh_rate > maxRefreshRate) maxRefreshRate = current.refresh_rate;
+			}
+		}
+		if (maxRefreshRate <= 60) maxRefreshRate = 60;
+
         float heightWidthRatio = (float)height / (float)width;
         projectM::Settings settings;
         settings.windowWidth = width;
         settings.windowHeight = height;
-        settings.meshX = 400;
+        settings.meshX = 128;
         settings.meshY = settings.meshX * heightWidthRatio;
-        settings.fps   = 60;
+		settings.fps = maxRefreshRate;
         settings.smoothPresetDuration = 3; // seconds
         settings.presetDuration = 22; // seconds
         settings.beatSensitivity = 0.8;

@@ -123,7 +123,6 @@ void projectM::default_key_handler( projectMEvent event, projectMKeycode keycode
 		case PROJECTM_K_h:
  		  renderer->showhelp = !renderer->showhelp;
 	      renderer->showstats= false;
-	      renderer->showfps=false;
 	    case PROJECTM_K_F1:
 	      renderer->showhelp = !renderer->showhelp;
 	      renderer->showstats=false;
@@ -134,8 +133,16 @@ void projectM::default_key_handler( projectMEvent event, projectMKeycode keycode
 		 break;
 
 	    case PROJECTM_K_F5:
-	      if (!renderer->showhelp)
-		      renderer->showfps = !renderer->showfps;
+		  renderer->showfps = !renderer->showfps;
+			// Initialize counters and reset frame count.
+			renderer->lastTime = duration_cast<milliseconds>(system_clock::now().time_since_epoch());
+			renderer->currentTime = duration_cast<milliseconds>(system_clock::now().time_since_epoch());
+			renderer->totalframes = 0;
+			// Hide preset name from screen and replace it with FPS counter.
+			if (renderer->showfps)
+			{
+				renderer->showpreset = false;
+			}
 	      break;
 	    case PROJECTM_K_F4:
 		if (!renderer->showhelp)
@@ -143,6 +150,11 @@ void projectM::default_key_handler( projectMEvent event, projectMKeycode keycode
 	      break;
 	    case PROJECTM_K_F3: {
 	      renderer->showpreset = !renderer->showpreset;
+			// Hide FPS from screen and replace it with preset name.
+			if (renderer->showpreset)
+			{
+				renderer->showfps = false;
+			}
 	      break;
 	     }
 	    case PROJECTM_K_F2:

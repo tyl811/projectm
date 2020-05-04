@@ -20,7 +20,8 @@ pm_font__DATA = fonts/Vera.ttf fonts/VeraMono.ttf
 # find and install all preset files
 install-data-local:
 if ENABLE_PRESET_SUBDIRS
-	find "$(PRESETSDIR)" -type f -exec install -Dm 755 "{}" "$(DESTDIR)/$(pm_data_dir)/{}" \;
+	find "$(PRESETSDIR)" -type d -exec $(MKDIR_P) "$(DESTDIR)/$(pm_data_dir)/{}" \;
+	find "$(PRESETSDIR)" -type f -exec $(INSTALL_DATA) "{}" "$(DESTDIR)/$(pm_data_dir)/{}" \;
 else
 	test -z $(DESTDIR)$(pkgdatadir) || $(MKDIR_P) $(DESTDIR)$(pm_presets_dir)
 	find "$(PRESETSDIR)" -type f -print0 | LC_ALL=C sort -z | xargs -0 '-I{}' $(INSTALL_DATA) '{}' $(DESTDIR)$(pm_presets_dir)
@@ -34,6 +35,15 @@ src/libprojectM/config.inp: src/libprojectM/config.inp.in Makefile
 	$(SED) -e "s,%datadir%,$(datadir),"g  $< >$@.tmp && \
 	chmod a-w $@.tmp && \
 	mv $@.tmp $@
+
+macOS/Build/Products/Debug/presets:
+	mkdir -p macOS/Build/Products/Debug
+	ln -s $(PWD)/presets macOS/Build/Products/Debug/
+
+build-mac: macOS/Build/Products/Debug/presets
+	xcrun xcodebuild -scheme "projectM SDL" -configuration Debug -derivedDataPath macOS
+	@echo "Products built in macOS/Build/Products/Debug"
+	open macOS/Build/Products/Debug
 
 # do a macOS build
 dist-mac: dist

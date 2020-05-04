@@ -1,4 +1,4 @@
-AC_INIT([projectM], [3.1.1-rc7], [mischa@mvstg.biz], [projectM], [https://github.com/projectM-visualizer/projectm/])
+AC_INIT([projectM], [3.1.4], [mischa@mvstg.biz], [projectM], [https://github.com/projectM-visualizer/projectm/])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign subdir-objects tar-pax])
 
 m4_ifdef([AM_PROG_AR], [AM_PROG_AR])
@@ -37,7 +37,7 @@ AS_IF([test "x$enable_emscripten" = "xyes" || test "x$EMSCRIPTEN" = "xyes"], [
   dnl Running in a normal OS (not emscripten)
   AX_CHECK_GL
 
-  # check OS
+  # check OS if mac or linux
   AC_CANONICAL_HOST
   AC_MSG_CHECKING(Freedom)
   case $host_os in
@@ -50,6 +50,9 @@ AS_IF([test "x$enable_emscripten" = "xyes" || test "x$EMSCRIPTEN" = "xyes"], [
     # limux needs dl
     AC_MSG_RESULT(GNU/LINUX detected)
     LIBS="$LIBS -ldl"
+    ;;
+  *)
+    AC_MSG_RESULT(Unknown)
     ;;
   esac
 ])
@@ -183,6 +186,10 @@ AS_IF([test "$enable_qt" != "no"],
         # we have at least qt5 if $have_qt is true
         enable_qt=yes
         export QT_SELECT=qt5
+
+        # we depend on libQt5Gui and libQt5OpenGL
+        # https://github.com/projectM-visualizer/projectm/issues/271
+        LIBS="$LIBS -lQt5Gui -lQt5OpenGL"
     ],
     [AS_IF([test "$enable_qt" = "yes"],
         [AC_MSG_ERROR(["Qt5 not found"])],
