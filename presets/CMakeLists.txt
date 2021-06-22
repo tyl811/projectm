@@ -10,6 +10,7 @@ if(ENABLE_PRESETS)
             presets_projectM
             presets_stock
             presets_tryptonaut
+            presets_tyler_collection
             presets_yin
             DESTINATION "${PROJECTM_DATADIR_PATH}/presets"
             COMPONENT Presets
